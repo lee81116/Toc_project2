@@ -173,7 +173,60 @@ public:
 		rotate_counterclockwise();
 		return score;
 	}
-
+	grid state_plun(unsigned opcode){
+		grid output;
+		switch (opcode & 0b11) {
+		case 0: output = state_up(); break;
+		case 1: output = state_right(); break;
+		case 2: output = state_down(); break;
+		case 3: output = state_left(); break;
+		}
+		return output;
+	}
+	grid state_left(){
+		grid output;
+		for (int r = 0; r < 4; r++)
+		{
+			auto &row = tile[r];
+			for (int c = 1; c < 4; c++)
+			{
+				auto &t0 = row[c - 1];
+				auto &t1 = row[c];
+				if (t0 == 0)
+				{
+					t0 = t1;
+					t1 = 0;
+				}
+				else if (t1 != 0 && ((t0 + t1 == 3) || (t0 == t1 && t0 >= 3 && t0 < 14)))
+				{
+					t0 = std::max(t0, t1) + 1;
+					t1 = 0;
+				}
+			}
+			output[r] = row;
+		}
+		return output;
+	}
+	grid state_right(){
+		reflect_horizontal();
+		grid output = state_left();
+		reflect_horizontal();
+		return output;
+	}
+	grid state_up()
+	{
+		rotate_clockwise();
+		grid output = state_left();
+		rotate_counterclockwise();
+		return output;
+	}
+	grid state_down()
+	{
+		rotate_clockwise();
+		grid output = state_left();
+		rotate_counterclockwise();
+		return output;
+	}
 	void rotate(int clockwise_count = 1) {
 		switch (((clockwise_count % 4) + 4) % 4) {
 		default:
