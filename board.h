@@ -116,7 +116,7 @@ public:
 		last(4);
 		return itov(tile);
 	}
-
+	grid get_tile(){return tile;}
 	/**
 	 * apply an action to the board
 	 * return the reward of the action, or -1 if the action is illegal
@@ -132,7 +132,7 @@ public:
 		if (r != -1) last(opcode & 0b11);
 		return r;
 	}
-	reward utility_function(reward t0){}
+	//reward utility_function(reward t0){}
 	reward slide_left() {
 		bool moved = false;
 		reward score = 0;

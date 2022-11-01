@@ -72,7 +72,7 @@ protected:
  */
 class weight_agent : public agent {
 public:
-	weight_agent(const std::string &args = "") : agent(args), alpha(0), opcode({0, 1, 2, 3})
+	weight_agent(const std::string &args = "") : agent(args), alpha(0.0125), opcode({0, 1, 2, 3})
 	{
 		if (meta.find("init") != meta.end())
 			init_weights(meta["init"]);
@@ -86,16 +86,18 @@ public:
 			save_weights(meta["save"]);
 	}
 	virtual action take_action(const board& before){
-		board::reward r_best = -1;
 		board::reward op_best = -1;
 		board::grid best_state;
 		float r_V_best = -1.0;
-		float best_V;
-		std::vector<int> best_tuples;
 		    
 		for (int op : opcode)
 		{
-			board::reward Fplun = board(before).slide(op);
+			board tmp = before;
+			board::reward reward = tmp.slide(op);
+			if(reward == -1){
+				continue;
+			}
+			board::reward Fplun = tmp.value();
 			board::reward F = before.value();
 			board::reward Reward = Fplun - F;
 			board::grid state = board(before).state_plun(op);
@@ -104,62 +106,70 @@ public:
 			float r_V = Reward + V;
 			if (r_V > r_V_best)
 			{
-				r_best = Reward;
 				r_V_best = r_V;
 				best_state = state;
 				op_best = op;
-				best_V = V;
-				best_tuples = tuples;
 			}
 		}
 
 		if(train){
 			update_weight(r_V_best);
 		}
-		
-		s_V = best_V;
-		s_tuples = best_tuples;
+		best_state = board(before).state_plun(op_best);
+		s_tuples = get_tuple(best_state);
+		s_V = get_V(s_tuples);
+
 		train=1;
+		 
 		if (op_best != -1)
 			return action::slide(op_best);
 		return action();
-	}
+	} 
 	void update_weight(const float st_1_r_V){
-		for(int i=0;i<8;i++){
-			net[i][s_tuples[i]] = net[i][s_tuples[i]] + alpha*(st_1_r_V - s_V);
+		for (int i = 0; i < 8; i++)
+		{
+			net[i][s_tuples[i]] = net[i][s_tuples[i]] + alpha * (st_1_r_V - s_V);
+		}
+	}
+	void last_update(){
+		for (int i = 0; i < 8; i++)
+		{
+			net[i][s_tuples[i]] = net[i][s_tuples[i]] + alpha * (0 - s_V);
 		}
 	}
 	float get_V(const std::vector<int>tuples){
-		float result=0;
-		for(int i=0;i<8;i++){
-			result += net[i][tuples[i]];
-		}
-		return result;
-	}
+		 float result=0;
+		 for(int i=0;i<8;i++){
+			 result += net[i][tuples[i]];
+		 }
+		 return result;
+	 }
 	std::vector<int> get_tuple(const board::grid state){
-		std::vector<int> tuples;
-		std::vector<int> col1;
-		std::vector<int> col2;
-		std::vector<int> col3;
-		std::vector<int> col4;
-		for(int i=0;i<4;i++){
-			board::row row = state[i];
-			int a = board::ttoi(row[0]);
-			col1.emplace_back(a);
-			int b = board::ttoi(row[1]);
-			col2.emplace_back(b);
-			int c = 16 * board::ttoi(row[2]);
-			col3.emplace_back(c);
-			int d = board::ttoi(row[3]);
-			col4.emplace_back(d);
-			tuples.emplace_back(16*16*16*a + 16*16*b + 16*c + d);
-		}
-		tuples.emplace_back(16*16*16*col1[0] + 16*16*col1[1] + 16*col1[2] + col1[3]);
-		tuples.emplace_back(16*16*16*col2[0] + 16*16*col2[1] + 16*col2[2] + col2[3]);
-		tuples.emplace_back(16*16*16*col3[0] + 16*16*col3[1] + 16*col3[2] + col3[3]);
-		tuples.emplace_back(16*16*16*col4[0] + 16*16*col4[1] + 16*col4[2] + col4[3]);
-		return tuples;
-	}
+		 std::vector<int> tuples;
+		 std::vector<int> col1;
+		 std::vector<int> col2;
+		 std::vector<int> col3;
+		 std::vector<int> col4;
+		 for(int i=0;i<4;i++){
+			 board::row row = state[i];
+			 int a = row[0];
+			 col1.emplace_back(a);
+			 int b = row[1];
+			 col2.emplace_back(b);
+			 int c = row[2];
+			 col3.emplace_back(c);
+			 int d = row[3];
+			 col4.emplace_back(d);
+			 tuples.emplace_back(16*16*16*a + 16*16*b + 16*c + d);
+		 }
+		 tuples.emplace_back(16*16*16*col1[0] + 16*16*col1[1] + 16*col1[2] + col1[3]);
+		 tuples.emplace_back(16*16*16*col2[0] + 16*16*col2[1] + 16*col2[2] + col2[3]);
+		 tuples.emplace_back(16*16*16*col3[0] + 16*16*col3[1] + 16*col3[2] + col3[3]);
+		 tuples.emplace_back(16*16*16*col4[0] + 16*16*col4[1] + 16*col4[2] + col4[3]);
+		 return tuples;
+	 }
+ 
+
 protected:
 	virtual void init_weights(const std::string& info) {
 		/*std::string res = info; // comma-separated sizes, e.g., "65536,65536"
@@ -260,13 +270,22 @@ private:
 
 class my_slider : public agent {
 	public:
-		my_slider(const std::string &args = "") : agent(args), opcode({0, 1, 2, 3}) {}
+		my_slider(const std::string &args = "") : agent(args), opcode({0, 1, 2, 3}) {
+			if (meta.find("init") != meta.end())
+				std::cout << "This is the args(fuck): " << args << std::endl;
+		}
+		virtual ~my_slider()
+		{
+			if (meta.find("save") != meta.end())
+				std::cout << "This is the save(fuck): " << std::endl;
+		}
 
 		virtual action take_action(const board& before){
 			board:: reward reward_best = -1;
 			board:: reward op_best = -1;
 			for (int op : opcode){
 				board::reward Reward = board(before).slide(op);
+				std::cout<< "reward:" << Reward << std::endl;
 				if (Reward > reward_best){
 					reward_best = Reward;
 					op_best = op;

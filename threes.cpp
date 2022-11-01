@@ -20,8 +20,7 @@
 int main(int argc, const char* argv[]) {
 	std::cout << "Threes! Demo: ";
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
-	std::cout << std::endl << std::endl;
-
+	std::cout << std::endl;
 	size_t total = 1000, block = 0, limit = 0;
 	std::string slide_args, place_args;
 	std::string load_path, save_path;
@@ -51,17 +50,14 @@ int main(int argc, const char* argv[]) {
 			save_path = next_opt();
 		}
 	}
-
 	statistics stats(total, block, limit);
-
 	if (load_path.size()) {
 		std::ifstream in(load_path, std::ios::in);
 		in >> stats;
 		in.close();
 		if (stats.is_finished()) stats.summary();
 	}
-
-	my_slider slide(slide_args);
+	weight_agent slide(slide_args);
 	random_placer place(place_args);
 
 	while (!stats.is_finished()) {
@@ -76,7 +72,10 @@ int main(int argc, const char* argv[]) {
 			action move = who.take_action(game.state());
 //			std::cerr << game.state() << "#" << game.step() << " " << who.name() << ": " << move << std::endl;
 			if (game.apply_action(move) != true) break;
-			if (who.check_for_win(game.state())) break;
+			if (who.check_for_win(game.state())) {
+				slide.last_update();
+				break;
+			}		
 		}
 		agent& win = game.last_turns(slide, place);
 		stats.close_episode(win.name());
